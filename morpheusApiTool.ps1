@@ -85,12 +85,17 @@ function Get-MorpheusApiProfile {
 
     Returns a new Api Profile object with empty values. Use Set-MorpheusApiProfile to configure
 
+    .PARAMETER AsJson
+
+    Return Api Profile as json object
+
     .OUTPUTS
     A New Morpheus Api Profile object 
     #> 
     [CmdletBinding()]
     param(
-        [Switch]$New
+        [Switch]$New,
+        [Switch]$AsJson
     )
     
     if ($New) {
@@ -107,7 +112,12 @@ function Get-MorpheusApiProfile {
     Write-Host "Token       = $($Script:ApiProfile.token)" -ForegroundColor Cyan
     Write-Host "SkipCert    = $($Script:ApiProfile.skipCert)" -ForegroundColor Cyan
     Write-Host ""
-    return $apiProfile
+    if ($AsJson) {
+        return $apiProfile | ConvertTo-Json
+    } else {
+        return $apiProfile
+    }
+    
 }
 
 function Set-MorpheusApiProfile {
@@ -147,15 +157,20 @@ function Set-MorpheusApiProfile {
     #>
     [CmdletBinding()]
     param (
-        [PSCustomObject]$ApiProfile,
+        [Object]$ApiProfile,
         [String]$Appliance,
         [String]$Token,
-        [Switch]$SkipCert
+        [Switch]$SkipCert,
+        [Switch]$AsJson
     )
 
     if ($ApiProfile) {
         # Use the Morpheus Api Profile object passed as a parameter as the Default
-        $Script:ApiProfile = $ApiProfile
+        if ($AsJson) {
+            $Script:ApiProfile = $ApiProfile | ConvertFron-Json
+        } else {
+            $Script:ApiProfile = $ApiProfile 
+        }
     } else {
         # Construct a new Profile from the individual properties (Appliance,Token and SkipCert)
         $apiProfile = Get-MorpheusApiProfile -New
