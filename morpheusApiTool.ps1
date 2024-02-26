@@ -167,7 +167,13 @@ function Set-MorpheusApiProfile {
     if ($ApiProfile) {
         # Use the Morpheus Api Profile object passed as a parameter as the Default
         if ($AsJson) {
-            $Script:ApiProfile = $ApiProfile | ConvertFrom-Json
+            try {
+                $ApiProfile = $ApiProfile | ConvertFrom-Json
+                $Script:ApiProfile = $ApiProfile
+            }
+            catch {
+                Write-Warning "Parameter ApiProfile is not valid Json"
+            }
         } else {
             $Script:ApiProfile = $ApiProfile 
         }
