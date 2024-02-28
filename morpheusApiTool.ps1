@@ -297,10 +297,17 @@ function Get-MorpheusApiToken {
         if (-Not $statusCode) {$statusCode=500}        
     }
     if ($statusCode -eq 200) {
-        $payload = $response.Content | Convertfrom-Json
-        return $payload.access_token
+        # Check content type
+        if ($response.Headers.item("Content-Type") -match "application/json") {
+            Write-Host "StatusCode 200 Response json $($response.Content)" -ForegroundColor Cyan
+            $payload = $response.Content | ConvertFrom-Json
+            return $payload.access_token
+        } else {
+            Write-Warning "Check ApplianceUrl : Expecting json response : Unable to get token"
+            return $null
+        }
     } else {
-        Write-Warning "Response StatusCode $($statusCode)"
+        Write-Warning "Failed to obtain token: Response StatusCode $($statusCode)"
         return $null
     }
 }
