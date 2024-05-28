@@ -350,40 +350,49 @@ function Invoke-MorpheusApi {
     param (
         [PSCustomObject]$ApiProfile=$Script:ApiProfile,
         [string]$Endpoint="api/whoami",
-        [string]$Method="Get",
+        [string]$Method="GET",
         [int]$PageSize=100,
         [Object]$Body=$null,
         [Switch]$AsJson
     )
 
+    # Force Method Uppercase
+    $Method = $Method.ToUpper()
     Write-Host "Using Appliance $($ApiProfile.appliance) :SkipCert $($ApiProfile.skipCert)" -ForegroundColor Green
     if ($Endpoint[0] -ne "/") {
         $Endpoint = "/" + $Endpoint
     }
     $Headers = @{"Authorization" = "Bearer $($ApiProfile.token)"; "Content-Type" = "application/json"}
-    if ($Body -or $Method -ne "Get" ) {
+    if ($Body -or $Method -ne "GET" ) {
         Write-Host "Method $Method : Endpoint $EndPoint" -ForegroundColor Green
-        if ($AsJson) {
-            # Body is already Specified as Json
-            $payload = $Body
+        if ($Body) {
+            if ($AsJson) {
+                # Body is already Specified as Json
+                $payload = $Body
+            } else {
+                # Body Object - convert to json payload for the Api (5 levels max)
+                $payload = $Body | Convertto-json -depth 5                
+            }
+            Write-Host "payload Body:" -ForegroundColor Green
+            Write-Host $payload -ForegroundColor Cyan
         } else {
-            # Body Object - convert to json payload for the Api (5 levels max)
-            $payload = $Body | Convertto-json -depth 5                
+            Write-Warning "No Payload supplied for method $($Method). Request will have no body parameter"
         }
-        Write-Host "payload Body:" -ForegroundColor Green
-        Write-Host $payload -ForegroundColor Cyan
         $params = @{
-            Uri="$($Appliance)$($Endpoint)"
+            Uri="$($ApiProfile.appliance)$($Endpoint)"
             Method=$Method;
-            Body=$Body;
             Headers=$Headers;
             ErrorAction="SilentlyContinue"
+        }
+        if ($Body) {
+            $params.Add("Body",$payload)
         }
         if ($Script:SkipCertSupported) {
             $params.Add("SkipCertificateCheck",$ApiProfile.skipCert)
         }
         # Use Parameter Splatting
         try {
+            $params
             $response = Invoke-WebRequest @params
             $statusCode = $response.StatusCode
         }
