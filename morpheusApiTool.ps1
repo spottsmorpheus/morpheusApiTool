@@ -559,7 +559,7 @@ function Get-MorpheusEventLogs {
 
     $provisionEvents =  Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType $ProcessType
 
-    $eventLogs= [System.Collections.Generic.List[Object]]::new()
+    $eventLogs= [System.Collections.Generic.SortedList[String,PSCustomObject]]::new()
     foreach ($process in $provisionEvents) {
         foreach ($event in $process.events) {
             if ($event.startDate -AND $event.endDate) {
@@ -578,30 +578,17 @@ function Get-MorpheusEventLogs {
                             seqNo=$log.seq;
                             message=$log.message
                         }
-                        $eventLogs.Add($logEvent)
+                        if (!$eventLogs.ContainsKey($LogEvent.seqNo)) {$eventLogs.Add($LogEvent.seqNo,$logEvent)}
                     }
-                } else {
-                    $logEvent = [PSCustomObject]@{
-                        name=$event.displayName;
-                        process=$process.processType.name;
-                        eventType=$event.processType.name;
-                        #eventStart=$event.startDate;
-                        #eventEnd=$event.endDate;
-                        logTime="";
-                        level="";
-                        seqNo="";
-                        message="No Logs for this TimeSpan"
-                    }
-                    $eventLogs.Add($logEvent)
-                }
+                } 
             }
         }      
     }
-
+    
     if ($AsJson) {
-        return $eventLogs.ToArray() | ConvertTo-Json -Depth 5
+        return $eventLogs.Values | ConvertTo-Json -Depth 5
     } else {
-        return $eventLogs.ToArray()
+        return $eventLogs.Values
     }
 }
 
