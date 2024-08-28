@@ -559,12 +559,12 @@ function Get-MorpheusEventLogs {
 
     $provisionEvents =  Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType $ProcessType
 
-    $eventLogs= [System.Collections.Generic.SortedList[String,PSCustomObject]]::new()
+    $eventLogs= [System.Collections.Generic.SortedList[int,PSCustomObject]]::new()
     foreach ($process in $provisionEvents) {
         foreach ($event in $process.events) {
             if ($event.startDate -AND $event.endDate) {
                 Write-Host "Grabbing Logs for Event $($event.displayName) - $($event.processType.name)" -ForegroundColor Green
-                $logs = Get-MorpheusLogs -Start $event.startDate -End $event.endDate | Sort-Object -prop seq
+                $logs = Get-MorpheusLogs -Start $event.startDate -End $event.endDate | Sort-Object -Property seq
                 if ($logs.count -gt 0) {
                     foreach ($log in $logs) {
                         $logEvent = [PSCustomObject]@{
