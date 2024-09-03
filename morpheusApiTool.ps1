@@ -506,7 +506,7 @@ function Get-MorpheusEvents {
     if ($ProcessType -eq "all") {
         return $proc.processes
     } else {
-        return $proc.processes| Where-Object {$_.processType.name -eq $ProcessType}
+        return $proc.processes| Where-Object {$_.processType.name -match $ProcessType}
     }
 }
 
@@ -557,32 +557,35 @@ function Get-MorpheusEventLogs {
         [switch]$AsJson
     ) 
 
-    $provisionEvents =  Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType $ProcessType
+    #Return and Array
+    $provisionEvents = @(Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType $ProcessType)
+    $null = $provisionEvents | Select-Object -ExpandProperty processType -Property startDate, endDate, displayName
+    $processList = $provisionEvents.processType | Sort-Object -Property startDate, endDate
+    $processList[0].startDate = $processList[0].startDate.addMinutes(-1)
+    $processList[($processList.count-1)].endDate = $processList[($processList.count-1)].endDate.AddMinutes(1)
 
     $eventLogs= [System.Collections.Generic.SortedList[int,PSCustomObject]]::new()
-    foreach ($process in $provisionEvents) {
-        foreach ($event in $process.events) {
-            if ($event.startDate -AND $event.endDate) {
-                Write-Host "Grabbing Logs for Event $($event.displayName) - $($event.processType.name)" -ForegroundColor Green
-                $logs = Get-MorpheusLogs -Start $event.startDate -End $event.endDate | Sort-Object -Property seq
-                if ($logs.count -gt 0) {
-                    foreach ($log in $logs) {
-                        $logEvent = [PSCustomObject]@{
-                            name=$event.displayName;
-                            process=$process.processType.name;
-                            eventType=$event.processType.name;
-                            #eventStart=$event.startDate;
-                            #eventEnd=$event.endDate;
-                            logTime=$log.ts;
-                            level=$log.level;
-                            seqNo=$log.seq;
-                            message=$log.message
-                        }
-                        if (!$eventLogs.ContainsKey($LogEvent.seqNo)) {$eventLogs.Add($LogEvent.seqNo,$logEvent)}
+    foreach ($process in $processList) {
+        if ($process.startDate -AND $process.endDate) {
+            Write-Host "Grabbing Logs for Event $($process.displayName)" -ForegroundColor Green
+            $logs = Get-MorpheusLogs -Start $process.startDate -End $process.endDate | Sort-Object -Property seq
+            Write-Host "Found logs count $($logs.count)" -ForegroundColor Green
+            if ($logs.count -gt 0) {
+                foreach ($log in $logs) {
+                    $logEvent = [PSCustomObject]@{
+                        name=$process.displayName;
+                        process=$process.name;
+                        #eventStart=$event.startDate;
+                        #eventEnd=$event.endDate;
+                        logTime=$log.ts;
+                        level=$log.level;
+                        seqNo=$log.seq;
+                        message=$log.message
                     }
-                } 
-            }
-        }      
+                    if (!$eventLogs.ContainsKey($LogEvent.seqNo)) {$eventLogs.Add($LogEvent.seqNo,$logEvent)}
+                }
+            } 
+        }
     }
     
     if ($AsJson) {
