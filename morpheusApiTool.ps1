@@ -166,7 +166,7 @@ function Set-MorpheusApiProfile {
 
     if ($ApiProfile) {
         # Use the Morpheus Api Profile object passed as a parameter as the Default
-        if ($AsJson) {
+        if ($ApiProfile.GetType().Name -eq "String") {
             try {
                 $ApiProfile = $ApiProfile | ConvertFrom-Json
                 $Script:ApiProfile = $ApiProfile
@@ -174,8 +174,10 @@ function Set-MorpheusApiProfile {
             catch {
                 Write-Warning "Parameter ApiProfile is not valid Json"
             }
-        } else {
+        } elseif ($ApiProfile.GetType().Name -eq "PSCustomObject") {
             $Script:ApiProfile = $ApiProfile 
+        } else {
+            Write-Warning "Parameter ApiProfile is not s recognised format"
         }
     } else {
         # Construct a new Profile from the individual properties (Appliance,Token and SkipCert)
@@ -315,7 +317,7 @@ function Get-MorpheusApiToken {
 function Invoke-MorpheusApi {
     <#
     .SYNOPSIS
-    Invokes the Morpheus API call 
+    Invokes the Morpheus API call
 
     .DESCRIPTION
     Invokes a Morpheus API call for the supplied EndPoint parameter. API calls are paged so
@@ -325,19 +327,22 @@ function Invoke-MorpheusApi {
     Invoke-MoprheusApi -EndPoint "/api/whoami"
 
     .PARAMETER ApiProfile
-    Morpheus Api Profile object. Use Set-MorpheusVariable
+    Morpheus Api Profile object. By default the current profile is used. Use Set-MorpheusApiProfile 
+    to set the default ApiProfile
 
     .PARAMETER EndPoint
-    API Endpint - The api endpoint and query parameters
+    API Endpint - The api endpoint and query parameters. Do not provide the appliance. eg
+    api/whoami or /api/instances/5
 
     .PARAMETER Method
     Method - Defaults to GET
 
     .PARAMETER PageSize
-    If the API enpoint supports paging, this parameter sets the size (max API parameter). Defaults to 100
+    If the API enpoint supports paging, this parameter sets the number of objects received per call. 
+    This Function will return all objects so choose PageSize carefully.
 
     .PARAMETER Body
-    If required the Body to be sent as payload
+    If required the Body to be sent as payload. Can be an Object or a json string
 
     .PARAMETER AsJson
     Switch to Accept json Body and Return json payload
