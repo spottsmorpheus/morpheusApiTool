@@ -165,7 +165,7 @@ NAME
     Get-MorpheusEventLogs
 
 SYNTAX
-    ç [[-InstanceId] <int>] [[-ServerId] <int>] [[-ProcessType] {task | workflow | provision | all}] [-AsJson]
+    Get-MorpheusEventLogs [[-InstanceId] <int>] [[-ServerId] <int>] [[-ProcessType] {task | workflow | provision | all}] [-AsJson]
 
 ```
 This function takes an Instance or Server id and extracts all the process steps associated with ProcessType (Default is Provision) and for each step in the process returns the Morpheus Health logs with cover the timespan
