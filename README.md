@@ -180,6 +180,7 @@ returns all the health logs covering the provision timespan of instance with id 
 
 The list of available fuctions is shown below. Use Powershell Get-Help "function-name" for details 
 
+```
 Function        Get-MorpheusApiProfile
 Function        Get-MorpheusApiToken
 Function        Get-MorpheusEventLogs
@@ -190,7 +191,7 @@ Function        Invoke-MorpheusApi
 Function        Set-MorpheusApiProfile
 Function        Set-PSCertificateCheck
 Function        Show-RoleFeaturePermissions
-
+```
 
 # Generating HTML Output 
 
@@ -206,7 +207,7 @@ if ($Response.StatusCode -eq 200) {
 }
 ```
 
-Function in ths module generate HTLM hat can be viewed in any Browser
+Functions in ths module generate HTLM hat can be viewed in any Browser
 
 Combined with the Morpheus Api functions the output can be rendered into a transportable and easily accessed format
 
@@ -216,4 +217,4 @@ For example to produce a report for the Heath Logs for provision of instance 77 
 Get-MorpheusEventLogs -InstanceId 77 | Out-HtmlPage -Title "Instance 77 Provision" -Path "./instance77.html"
 ```
 
-If your Powershell session has access to a Browser then he defaulp browser automatically loads the output
+If your Powershell session has access to a Browser then he default browser automatically loads the output
