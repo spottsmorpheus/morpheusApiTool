@@ -81,6 +81,20 @@ function filterMessage() {
         logEntries[i].parentNode.style.display="none";
     } 
   }
+};
+function hideDebug() {
+  var input;
+  input = document.getElementById("hidedebug");
+  var logLevels = document.getElementsByClassName("level");
+  for (i = 0; i < logLevels.length; i++) {
+    if (logLevels[i].innerText == "DEBUG") {
+      if (input.checked) {
+        logLevels[i].parentNode.style.display="none";
+      } else {     
+        logLevels[i].parentNode.style.display="";
+      }
+    } 
+  }
 }
 '@
 
@@ -94,6 +108,7 @@ function filterMessage() {
 $ClassMap = @{}
 $ClassMap.Add("message","logentry")
 $ClassMap.Add("output","logentry")
+$ClassMap.Add("level","level")
 
 # HttpUtility
 Add-Type -AssemblyName System.Web
@@ -134,7 +149,7 @@ Function Out-HtmlPage {
     )
 
     Begin {
-        $html = [ç]::new()
+        $html = [System.Text.StringBuilder]::new()
         #Transitional DocType
         [void]$html.AppendLine($Script:DTD)
         #Head
@@ -147,11 +162,11 @@ Function Out-HtmlPage {
         [void]$html.AppendLine('<div class="filter">')
         [void]$html.AppendLine('<label>Filter</label>')
         [void]$html.AppendLine('<input type="text" id="tableFilter" onkeyup="filterMessage()" placeholder="Filter log .." title="Type in a name">')
+        [void]$html.AppendLine('<input type="checkbox" id="hidedebug" onchange="hideDebug()" name="hidedebug">')
+        [void]$html.AppendLine('<label for="hidedebug">hide debug</label>')
+        [void]$html.AppendFormat('<span>{0} @ {1}</span>',$Title,[DateTime]::now).AppendLine()
         [void]$html.AppendLine('</div>')
-
         [void]$html.AppendLine('<div class="table">')
-        [void]$html.AppendFormat('<h2>{0} @ {1}</h2>',$Title,[DateTime]::now).AppendLine()
-
         # Need to collect the Pipeline for the Body
         $TableData= [System.Collections.Generic.List[Object]]::new()
     }
