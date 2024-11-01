@@ -109,6 +109,7 @@ $ClassMap = @{}
 $ClassMap.Add("message","logentry")
 $ClassMap.Add("output","logentry")
 $ClassMap.Add("level","level")
+$ClassMap.Add("content","logentry")
 
 # HttpUtility
 Add-Type -AssemblyName System.Web
