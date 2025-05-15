@@ -45,11 +45,90 @@ To get the current profile and save this as a [PSCustomObject] use the Function
 $myProfile = Get-MorpheusApiProfile
 ```
 
-You can set up profiles for your sappliances and store them in Powershell variables and use the
+You can set up profiles for your appliances and store them in Powershell variables and use the Set-MorpheusApiProfile to easily switch profiles
+
 ```
-Set-MorpheusApiProfile -ApiProfile $SavedProfile
+# JSON Profiile
+$DevProfile = @"
+{
+  "appliance": "https://dev.myappliance.com",
+  "token": "96af293f-a01b-4cb6-9eb0-fe709xxxxx",
+  "skipCert": true
+}
+"@
+
+# [PSCustomObject] Profile
+
+$ProdProfile = [PSCustomObject]@{
+    appliance="https://dev.myappliance.com";
+    token="96af293f-a01b-4cb6-9eb0-fe709yyyy";
+    skipCert=$false
+}
+# Set Dev profile
+Set-MorpheusApiProfile -ApiProfile $DevProfile
+
+# Set Prod Profile
+Set-MorpheusApiProfile -ApiProfile $ProdProfile
 ```
-to easily switch profiles
+
+
+## Obtaining a Token
+
+Use the function Get-MorpheusApiToken to obtain a Bearer token for the appliance and user credentials.
+
+```
+
+NAME
+    Get-MorpheusApiToken
+    
+SYNOPSIS
+    Gets the Morpheus API token for the User Credentials supplied
+    
+    
+SYNTAX
+    Get-MorpheusApiToken [[-Appliance] <String>] [[-Credential] <PSCredential>] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Gets the Morpheus API token for the User Credentials supplied
+    
+    Examples:
+    Get-MorpheusApiToken -Appliance <MorpheusApplianceURL> -Credential <PSCredentialObject>
+    
+
+PARAMETERS
+    -Appliance <String>
+        Appliance Name - Defaults to the Script level variable set by Set-MorpheusAppliance
+        
+    -Credential <PSCredential>
+        PSCredential Object - if missing Credentials will be prompted for
+        
+```
+
+If you do not provide a PSCredential as a parameter the function will prompt for username and password. In the example below the appliance does not have a signed certificate so Skip Certificate checking is setup first
+
+```
+Set-PSCertificateCheck -SkipCert
+
+$token = Get-MorpheusApiToken -Appliance "https://myappliancename.com"
+
+PowerShell credential request
+Enter Morpheus UI Credentials
+User: admin
+Password for user admin: *********
+
+Invoking Api https://myappliancename.com/oauth/token?grant_type=password&scope=write&client_id=morph-api
+StatusCode 200 Response json {"access_token":"96af293f-a01b-4cb6-9eb0-fe709dbc7xxx","token_type":"bearer","refresh_token":"59363211-6c6d-4777-accd-c00a6b0d55b1","expires_in":857336,"scope":"write"}
+
+$token
+
+96af293f-a01b-4cb6-9eb0-fe709dbc7xxx
+
+#Set up the api profile with the token and in this case skip certificate checking
+
+$MyProfile = Set-MorpheusApiProfile -Appliance "https://myappliancename.com" -Token $token -SkipCert
+
+```
 
 ## Invoking Morpheus Api
 
@@ -142,16 +221,133 @@ OUTPUTS
     [PSCustomObject] API response or [String] json if -AsJson parameter specified
 ```
 
-For example to return all instances 200 at a time using the current Api profile use the following command
+Invoke-MorpheusApi without an Endpoint parameter defaults to /api/whoami
 
 ```
-$instances = Invoke-MorpheusApi -Endpoint "/api/instances" -PageSize 200
+Invoke-MorpheusApi
+
+Using Appliance https://myappliancename.com :SkipCert True
+Method GET : Paging in chunks of 100
+Requesting https://myappliancename.com/api/whoami?offset=0&max=100
+Page: 0 - 100 
+Returning complete payload                                                                                              
+
+user
+----                                                                                                                                                                                                                                                                                             
+@{id=1; accountId=1; username= ....
+
+
+```
+
+### Paging is Automatically performed
+
+Invoke-MorpheusApi will always return all items in the PageSize specified (by default 100). This may not always be desirable but unfortunately this is the standard behaviour. Performance issues are mitigated by Paging so choose a PageSize that suits your needs. Responses that return pagable payloads are automatically collated so that the function returns a single collection with all objects
+
+
+For example to return all Layouts 250 at a time using the current Api profile use the following command
+
+```
+$layouts = Invoke-MorpheusApi -Endpoint "/api/library/layouts" -PageSize 250
+
+$layouts =  Invoke-MorpheusApi -Endpoint "/api/library/layouts" -PageSize 250
+Using Appliance https://myappliancename.com :SkipCert True
+Method GET : Paging in chunks of 250
+Requesting https://myappliancename.com/api/library/layouts?offset=0&max=250
+Page: 0 - 250 
+Requesting https://myappliancename.com/api/library/layouts?offset=250&max=250                          
+Page: 250 - 500 of 559
+Requesting https://myappliancename.com/api/library/layouts?offset=500&max=250                          
+Page: 500 - 750 of 559
+
+# $layouts variable contains collated response from all pages
+
+$layouts.instanceTypeLayouts.count                                            
+559
+
+
 ```
 
 if you want the output as JSON use
 
 ```
-$instances = Invoke-MorpheusApi -Endpoint "/api/instances" -PageSize 200 -AsJson
+$layouts = Invoke-MorpheusApi -Endpoint "/api/library/layouts" -PageSize 250 -AsJson
+
+```
+
+## Using Post with Body
+
+The default method is GET but all other HTTP methods are supported. Specify the required method with the -Method parameter. If the API requires a body object the correctly formed object must be passed in the -Body parameter. The Body object can be JSON string or any object that can be converted to JSON (conversion is performed automatically the function).
+
+If you want any response to be rendered in JSON add the -AsJson parameter same as GET methods
+
+Below is an example API call to create a Group. The first example uses a JSON body, the second uses a [PSCustomObject]
+
+```
+#Use a Here String to format the Body string as JSON
+$grp = @"
+{
+    "group":
+        {
+            "name":"DevSystems1",
+            "code":"DEVSYS",
+            "labels":[
+                "DevSystemUK"
+            ]
+        }
+}
+"@
+
+# Use the -Method Parameter and the -Body Parameter. In this example the response is returned as Json
+
+Invoke-MorpheusApi -Method "POST" -Endpoint "/api/groups" -Body $grp -AsJson
+Using Appliance https://myappliancename.com :SkipCert True
+Method POST : Endpoint /api/groups
+payload Body:
+{
+    "group":
+        {
+            "name":"DevSystems1",
+            "code":"DEVSYS",
+            "labels":[
+                "DevSystemUK"
+            ]
+        }
+}
+
+Success:                                                                                                                
+{"group":{"id":5,"uuid":"08b75634-b666-4fe4-a5e2-355c22ec4fbe","name":"DevSystems1","code":"DEVSYS","labels":["DevSystemUK"],"location":null,"accountId":1,"active":true,"config":{},"dateCreated":"2025-05-14T20:24:49Z","lastUpdated":"2025-05-14T20:24:49Z","zones":[],"stats":{"instanceCounts":{"all":0},"serverCounts":{"all":0,"host":0,"hypervisor":0,"containerHost":0,"vm":0,"baremetal":0,"unmanaged":0}},"serverCount":0},"success":true}
+
+# and in this example the body is a [PSCustomObject]
+
+$grpObj = [PSCustomObject]@{
+    group=[PSCustomObject]@{
+        name="DevSystems2";
+        code="DEVSYS";
+        labels=@("DevSystemUK","DevSystmUS")
+    }
+}
+
+$status =Invoke-MorpheusApi -Method "POST" -Endpoint "/api/groups" -Body $grpobj
+
+Using Appliance https://myappliancename.com :SkipCert True
+Method POST : Endpoint /api/groups
+payload Body:
+{
+  "group": {
+    "name": "DevSystems2",
+    "code": "DEVSYS",
+    "labels": [
+      "DevSystemUK",
+      "DevSystmUS"
+    ]
+  }
+}
+# Access the status
+$status | fl                                                                     
+
+group   : @{id=7; uuid=2c0ab64e-f362-4594-96b4-86d013925fbb; name=DevSystems2; code=DEVSYS; labels=System.Object[]; location=; accountId=1; active=True; config=; dateCreated=14/05/2025 20:29:10; lastUpdated=14/05/2025 20:29:10; zones=System.Object[]; stats=; serverCount=0}
+success : True
+
 ```
 
 ## Wrapper Functions
@@ -207,7 +403,7 @@ if ($Response.StatusCode -eq 200) {
 }
 ```
 
-Functions in ths module generate HTLM hat can be viewed in any Browser
+Functions in ths module generate an HTLM document with built in stylesheet and Javascript functions that can be opened and viewed in any browser without needing a web server. Tbe Out-HTMLPage function basically takes an array of objects and tries to convert theese into HTML tables with a column for each property. You can use Select-Object to filter out the properties you want to to display. The Function is quite flexible.
 
 Combined with the Morpheus Api functions the output can be rendered into a transportable and easily accessed format
 

@@ -8,8 +8,8 @@ $ApiProfile = [PSCustomObject]@{
 # Script level Boolean variable indicates if -SkipCertificateCheck is supported on Invoke-WebRequest calls
 $SkipCertSupported = ($PSVersionTable.PSVersion.Major -ge 6)
 
-            # Accept Tls1.1, 1.2
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls12
+# Accept Tls1.1, 1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls12
 
 #Type Declaration for overriding Certs on Windows systems prior to Powershell v6 when -SkipCertificateCheck was introduced
 $certCallback = @"
@@ -238,9 +238,9 @@ function Set-PSCertificateCheck {
         $Script:ApiProfile.skipCert = $false
         if ($Script:SkipCertSupported) {
             # Native support via -SlikCertificateCheck parameter
-            Write-Host "Parameter -SkipCertificateCheck will Not be used on Invoke-Webrequest for this profile" -ForegroundColor Yellow
+            Write-Host "Invoke-Webrequest calls will expect a signed certificate for this profile" -ForegroundColor Yellow
         } else {
-            Write-Host "Re-Instating defualt ServerCertificateValidationCallback" -ForegroundColor Yellow
+            Write-Host "Re-Instating default ServerCertificateValidationCallback" -ForegroundColor Yellow
             [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $Null
         }
     }
@@ -371,12 +371,19 @@ function Invoke-MorpheusApi {
     if ($Body -or $Method -ne "GET" ) {
         Write-Host "Method $Method : Endpoint $EndPoint" -ForegroundColor Green
         if ($Body) {
-            if ($AsJson) {
-                # Body is already Specified as Json
+            # Check the type if its string Then assume its JSON
+            if ($Body.GetType().Name -eq "String") {
+                # Body is already Specified as JSON String
                 $payload = $Body
             } else {
-                # Body Object - convert to json payload for the Api (5 levels max)
-                $payload = $Body | Convertto-json -depth 5                
+                # Body Object - convert to json payload for the Api (5 levels max
+                try {
+                    $payload = $Body | Convertto-Json -depth 5 -ErrorAction Stop
+                }
+                catch {
+                    Write-Warning "Failed to convert Payload into JSON"
+                    return
+                }               
             }
             Write-Host "payload Body:" -ForegroundColor Green
             Write-Host $payload -ForegroundColor Cyan
@@ -397,7 +404,6 @@ function Invoke-MorpheusApi {
         }
         # Use Parameter Splatting
         try {
-            $params
             $response = Invoke-WebRequest @params
             $statusCode = $response.StatusCode
         }
@@ -492,11 +498,46 @@ function Invoke-MorpheusApi {
 
 
 function Get-MorpheusEvents {
+    <#
+    .SYNOPSIS
+    Returns the Process Event history associated with process types
+
+    - Task, Workflow, Provision or all
+
+    Associated with am InstanceId or ServerId
+
+    .DESCRIPTION
+    Returns the Process Event history associated with process types
+
+    - Task, Workflow, Provision or all
+
+    Associated with am InstanceId or ServerId
+
+    .PARAMETER InstanceId
+
+    Returns Process Events for InstanceId
+
+    .PARAMETER ServerId
+
+    Returns Process Events for ServerId
+
+    .PARAMETER ProcessType
+
+    May be one of task, workflow, provision or all
+
+    .PARAMETER AsJson
+
+    Return the output as Json
+
+    .OUTPUTS
+    PSCustomObject or Json 
+    #> 
     param (
         [int32]$InstanceId=0,
         [int32]$ServerId=0,
         [ValidateSet("task","workflow","provision","all")]
-        [string]$ProcessType="all"
+        [string]$ProcessType="all",
+        [switch]$AsJson
     )
 
     if ($InstanceId -ne 0) {
@@ -509,13 +550,40 @@ function Get-MorpheusEvents {
     
     # Filter By ProcessType if required
     if ($ProcessType -eq "all") {
-        return $proc.processes
+        $returnData =  $proc.processes
     } else {
-        return $proc.processes| Where-Object {$_.processType.name -match $ProcessType}
+        $returnData = $proc.processes| Where-Object {$_.processType.name -match $ProcessType}
+    }
+    if ($AsJson) {
+        return $returnData | Convertto-Json -depth 10
+    } else {
+        return $returnData
     }
 }
 
 function Get-MorpheusLogs {
+    <#
+    .SYNOPSIS
+    Returns the Morpheus Health Logs
+
+    .DESCRIPTION
+    Returns the Morpheus Health Logs optionally specifying a start and end time
+
+    .PARAMETER Start
+
+    DateTime of DateTime parseable string representing the Date where log records should start
+
+    .PARAMETER End
+
+    DateTime of DateTime parseable string representing the Date where log records should end
+
+    .PARAMETER ProcessType
+
+    May be one of task, workflow, provision or all
+
+    .OUTPUTS
+    PSCustomObject
+    #> 
     param (
         [Object]$Start=$null,
         [Object]$End=$null
@@ -547,6 +615,7 @@ function Get-MorpheusLogs {
         $Log = $Response.logs 
         return $Log
     } else {
+        Write-Warning "Returning All Health Logs"
         $Response = Invoke-MorpheusApi -Endpoint "/api/health/logs" -PageSize 1000
         $Log = $Response.logs 
         return $Log     
@@ -554,49 +623,72 @@ function Get-MorpheusLogs {
 }
 
 function Get-MorpheusEventLogs {
+    <#
+    .SYNOPSIS
+    Returns the Morpheus Health Logs for the timespan covering the Provision of an Instance or Server
+
+    .DESCRIPTION
+    Given a Server or Instance ID, this function returns the Health Logs for all the Process Events in the 
+    Provision History
+
+    .PARAMETER InstanceId
+
+    Returns Health Logs for timespan covering the provision of InstanceId
+
+    .PARAMETER ServerId
+
+    Returns Health Logs for timespan covering the provision of ServerId
+
+    .OUTPUTS
+    PSCustomObject
+    #> 
     param (
         [int32]$InstanceId=0,
         [int32]$ServerId=0,
-        [ValidateSet("task","workflow","provision","all")]
-        [string]$ProcessType="provision",
         [switch]$AsJson
     ) 
 
     #Return and Array
-    $provisionEvents = @(Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType $ProcessType)
-    $null = $provisionEvents | Select-Object -ExpandProperty processType -Property startDate, endDate, displayName
-    $processList = $provisionEvents.processType | Sort-Object -Property startDate, endDate
-    $processList[0].startDate = $processList[0].startDate.addMinutes(-1)
-    $processList[($processList.count-1)].endDate = $processList[($processList.count-1)].endDate.AddMinutes(1)
+    $provisionEvents = @(Get-MorpheusEvents -InstanceId $InstanceId -ServerId $ServerId -ProcessType "provision")
+    if ($provisionEvents) {
+        #use ExpandProperty to get Start, End and displayName for the processType
+        $null = $provisionEvents | Select-Object -ExpandProperty processType -Property startDate, endDate, displayName
+        $processList = $provisionEvents.processType | Sort-Object -Property startDate, endDate
+        #Add a minute before and after the forst and last steps to ensure coverage
+        $processList[0].startDate = $processList[0].startDate.addMinutes(-1)
+        $processList[($processList.count-1)].endDate = $processList[($processList.count-1)].endDate.AddMinutes(1)
 
-    $eventLogs= [System.Collections.Generic.SortedList[int,PSCustomObject]]::new()
-    foreach ($process in $processList) {
-        if ($process.startDate -AND $process.endDate) {
-            Write-Host "Grabbing Logs for Event $($process.displayName)" -ForegroundColor Green
-            $logs = Get-MorpheusLogs -Start $process.startDate -End $process.endDate | Sort-Object -Property seq
-            Write-Host "Found logs count $($logs.count)" -ForegroundColor Green
-            if ($logs.count -gt 0) {
-                foreach ($log in $logs) {
-                    $logEvent = [PSCustomObject]@{
-                        name=$process.displayName;
-                        process=$process.name;
-                        #eventStart=$event.startDate;
-                        #eventEnd=$event.endDate;
-                        logTime=$log.ts;
-                        level=$log.level;
-                        seqNo=$log.seq;
-                        message=$log.message
+        $eventLogs= [System.Collections.Generic.SortedList[int,PSCustomObject]]::new()
+        foreach ($process in $processList) {
+            if ($process.startDate -AND $process.endDate) {
+                Write-Host "Grabbing Logs for Event $($process.displayName)" -ForegroundColor Green
+                $logs = Get-MorpheusLogs -Start $process.startDate -End $process.endDate | Sort-Object -Property seq
+                Write-Host "Found logs count $($logs.count)" -ForegroundColor Green
+                if ($logs.count -gt 0) {
+                    foreach ($log in $logs) {
+                        $logEvent = [PSCustomObject]@{
+                            name=$process.displayName;
+                            process=$process.name;
+                            #eventStart=$event.startDate;
+                            #eventEnd=$event.endDate;
+                            logTime=$log.ts;
+                            level=$log.level;
+                            seqNo=$log.seq;
+                            message=$log.message
+                        }
+                        if (!$eventLogs.ContainsKey($LogEvent.seqNo)) {$eventLogs.Add($LogEvent.seqNo,$logEvent)}
                     }
-                    if (!$eventLogs.ContainsKey($LogEvent.seqNo)) {$eventLogs.Add($LogEvent.seqNo,$logEvent)}
-                }
-            } 
+                } 
+            }
         }
-    }
-    
-    if ($AsJson) {
-        return $eventLogs.Values | ConvertTo-Json -Depth 5
+        
+        if ($AsJson) {
+            return $eventLogs.Values | ConvertTo-Json -Depth 5
+        } else {
+            return $eventLogs.Values
+        }
     } else {
-        return $eventLogs.Values
+        Write-Warning "There are no Health Logs covering this Provision"
     }
 }
 
@@ -619,7 +711,6 @@ Function Show-RoleFeaturePermissions {
         $FeaturePermissionsMatrix.Add($Permission)
     }
     $FeaturePermissionsMatrix
-
 }
 
 
