@@ -274,9 +274,16 @@ $layouts = Invoke-MorpheusApi -Endpoint "/api/library/layouts" -PageSize 250 -As
 
 ```
 
-Posts
+## Using Post with Body
+
+The default method is GET but all other HTTP methods are supported. Specify the required method with the -Method parameter. If the API requires a body object the correctly formed object must be passed in the -Body parameter. The Body object can be JSON string or any object that can be converted to JSON (conversion is performed automatically the function).
+
+If you want any response to be rendered in JSON add the -AsJson parameter same as GET methods
+
+Below is an example API call to create a Group. The first example uses a JSON body, the second uses a [PSCustomObject]
 
 ```
+#Use a Here String to format the Body string as JSON
 $grp = @"
 {
     "group":
@@ -290,18 +297,9 @@ $grp = @"
 }
 "@
 
-# or [PSCustomObject]
-$grpObj = [PSCustomObject]@{
-    group=[PSCustomObject]@{
-        name="DevSystems2";
-        code="DEVSYS";
-        labels=@("DevSystemUK","DevSystmUS")
-    }
-}
+# Use the -Method Parameter and the -Body Parameter. In this example the response is returned as Json
 
-# Use post with a JSON body add the -AsJson parameter
-
-Invoke-MorpheusApi -Method "POST" -Endpoint "/api/groups" -Body $grp  -AsJson
+Invoke-MorpheusApi -Method "POST" -Endpoint "/api/groups" -Body $grp -AsJson
 Using Appliance https://myappliancename.com :SkipCert True
 Method POST : Endpoint /api/groups
 payload Body:
@@ -319,7 +317,16 @@ payload Body:
 Success:                                                                                                                
 {"group":{"id":5,"uuid":"08b75634-b666-4fe4-a5e2-355c22ec4fbe","name":"DevSystems1","code":"DEVSYS","labels":["DevSystemUK"],"location":null,"accountId":1,"active":true,"config":{},"dateCreated":"2025-05-14T20:24:49Z","lastUpdated":"2025-05-14T20:24:49Z","zones":[],"stats":{"instanceCounts":{"all":0},"serverCounts":{"all":0,"host":0,"hypervisor":0,"containerHost":0,"vm":0,"baremetal":0,"unmanaged":0}},"serverCount":0},"success":true}
 
-# and with the [PSCustomObject]
+# and in this example the body is a [PSCustomObject]
+
+$grpObj = [PSCustomObject]@{
+    group=[PSCustomObject]@{
+        name="DevSystems2";
+        code="DEVSYS";
+        labels=@("DevSystemUK","DevSystmUS")
+    }
+}
+
 $status =Invoke-MorpheusApi -Method "POST" -Endpoint "/api/groups" -Body $grpobj
 
 Using Appliance https://myappliancename.com :SkipCert True
@@ -396,7 +403,7 @@ if ($Response.StatusCode -eq 200) {
 }
 ```
 
-Functions in ths module generate HTLM hat can be viewed in any Browser
+Functions in ths module generate an HTLM document with built in stylesheet and Javascript functions that can be opened and viewed in any browser without needing a web server. Tbe Out-HTMLPage function basically takes an array of objects and tries to convert theese into HTML tables with a column for each property. You can use Select-Object to filter out the properties you want to to display. The Function is quite flexible.
 
 Combined with the Morpheus Api functions the output can be rendered into a transportable and easily accessed format
 

@@ -371,12 +371,19 @@ function Invoke-MorpheusApi {
     if ($Body -or $Method -ne "GET" ) {
         Write-Host "Method $Method : Endpoint $EndPoint" -ForegroundColor Green
         if ($Body) {
-            if ($AsJson) {
-                # Body is already Specified as Json
+            # Check the type if its string Then assume its JSON
+            if ($Body.GetType().Name -eq "String") {
+                # Body is already Specified as JSON String
                 $payload = $Body
             } else {
-                # Body Object - convert to json payload for the Api (5 levels max)
-                $payload = $Body | Convertto-json -depth 5                
+                # Body Object - convert to json payload for the Api (5 levels max
+                try {
+                    $payload = $Body | Convertto-Json -depth 5 -ErrorAction Stop
+                }
+                catch {
+                    Write-Warning "Failed to convert Payload into JSON"
+                    return
+                }               
             }
             Write-Host "payload Body:" -ForegroundColor Green
             Write-Host $payload -ForegroundColor Cyan
