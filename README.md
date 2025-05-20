@@ -4,6 +4,7 @@ Powershell Code for wrapping Morpheus API calls (Powershell and Powershell Core)
 To load this module directly from GitHub
 
 ```
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls12
 $Uri = "https://raw.githubusercontent.com/spottsmorpheus/morpheusApiTool/main/morpheusApiTool.ps1"
 $ProgressPreference = "SilentlyContinue"
 # Load Powershell code from GitHub Uri and invoke as a temporary Module
@@ -394,6 +395,7 @@ Function        Show-RoleFeaturePermissions
 Load the HTML Scripts as a dynamic module. Copy and paste into the same Powershell session to make the functions available
 
 ```
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls12
 $Uri = "https://raw.githubusercontent.com/spottsmorpheus/morpheusApiTool/main/outHtml.ps1"
 $ProgressPreference = "SilentlyContinue"
 # Load Powershell code from GitHub Uri and invoke as a temporary Module
